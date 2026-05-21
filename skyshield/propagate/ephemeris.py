@@ -93,6 +93,88 @@ def filter_by_useable_window(
     return out
 
 
+def batch_interp_state(
+    ocm,
+    query_epochs: list[datetime],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Vectorized cubic-Hermite interpolation at many query epochs.
+
+    Returns (positions, velocities) both shaped (len(query_epochs), 3).
+    Cells corresponding to queries outside the OCM's useable window or
+    sample range are filled with NaN.
+
+    Internally uses np.searchsorted (O(log N) per query) and vectorized
+    Hermite basis evaluation — orders of magnitude faster than calling
+    `interp_state` in a Python loop.
+    """
+    n_q = len(query_epochs)
+    out_p = np.full((n_q, 3), np.nan, dtype=np.float64)
+    out_v = np.full((n_q, 3), np.nan, dtype=np.float64)
+
+    if not ocm.states:
+        return out_p, out_v
+
+    # Build epoch + state arrays once
+    epochs_seconds = np.array([s.epoch.timestamp() for s in ocm.states], dtype=np.float64)
+    states = np.array([s.as_array() for s in ocm.states], dtype=np.float64)  # (N, 6)
+    positions = states[:, :3]
+    velocities = states[:, 3:]
+
+    q_t = np.array([t.timestamp() for t in query_epochs], dtype=np.float64)
+
+    # Useable-window mask
+    if ocm.useable_start is not None:
+        q_t_min = ocm.useable_start.timestamp()
+        valid = q_t >= q_t_min
+    else:
+        valid = np.ones(n_q, dtype=bool)
+    if ocm.useable_stop is not None:
+        q_t_max = ocm.useable_stop.timestamp()
+        valid &= q_t <= q_t_max
+
+    # Sample-range mask
+    if epochs_seconds.size > 0:
+        valid &= (q_t >= epochs_seconds[0]) & (q_t <= epochs_seconds[-1])
+
+    if not valid.any():
+        return out_p, out_v
+
+    # Find bracketing indices via searchsorted
+    idx = np.searchsorted(epochs_seconds, q_t, side="right") - 1
+    idx = np.clip(idx, 0, epochs_seconds.size - 2)
+
+    t0 = epochs_seconds[idx]
+    t1 = epochs_seconds[idx + 1]
+    h = t1 - t0
+    # Avoid divide-by-zero
+    h_safe = np.where(h > 0, h, 1.0)
+    u = (q_t - t0) / h_safe
+
+    # Hermite basis functions
+    h00 = 2.0 * u**3 - 3.0 * u**2 + 1.0
+    h10 = u**3 - 2.0 * u**2 + u
+    h01 = -2.0 * u**3 + 3.0 * u**2
+    h11 = u**3 - u**2
+
+    p0 = positions[idx]
+    p1 = positions[idx + 1]
+    v0 = velocities[idx]
+    v1 = velocities[idx + 1]
+    h_col = h[:, None]
+    p = h00[:, None] * p0 + h10[:, None] * h_col * v0 + h01[:, None] * p1 + h11[:, None] * h_col * v1
+
+    # Derivative for velocity
+    h00d = (6.0 * u**2 - 6.0 * u) / h_safe
+    h10d = 3.0 * u**2 - 4.0 * u + 1.0
+    h01d = (-6.0 * u**2 + 6.0 * u) / h_safe
+    h11d = 3.0 * u**2 - 2.0 * u
+    v = h00d[:, None] * p0 + h10d[:, None] * v0 + h01d[:, None] * p1 + h11d[:, None] * v1
+
+    out_p[valid] = p[valid]
+    out_v[valid] = v[valid]
+    return out_p, out_v
+
+
 def apogee_perigee(states: np.ndarray) -> tuple[float, float]:
     """Estimate apogee and perigee from an ephemeris state matrix.
 

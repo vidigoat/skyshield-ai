@@ -40,6 +40,7 @@ from skyshield.propagate.ephemeris import (
 )
 from skyshield.propagate.ocm import OCM, parse_ocm_directory
 from skyshield.screen.smart_screen import smart_screen
+from skyshield.screen.vector_screen import vector_screen
 from skyshield.types import Conjunction
 
 
@@ -122,8 +123,8 @@ def run_tracss_screening(
     ocms = filter_by_useable_window(ocms, window_start, window_end)
     result.n_ephemerides_after_filters = len(ocms)
 
-    # Stage 4: spatial screening
-    candidates = smart_screen(
+    # Stage 4: spatial screening (vectorized — uses precomputed position tensor)
+    candidates = vector_screen(
         ocms,
         window_start=window_start,
         window_end=window_end,
