@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from skyshield import __version__
 from skyshield.agent.agent import SkyShieldAgent, ToolEvent
 from skyshield.agent.tools import dispatch_tool_call
+from skyshield.server.live_stream import demo_emit_loop, hub
 from skyshield.server.rate_limit import RateLimiter
 
 app = FastAPI(
@@ -154,6 +155,59 @@ async def maneuver(req: ManeuverRequest) -> dict[str, Any]:
 @app.get("/satellites/{query}")
 async def satellite_info(query: str) -> dict[str, Any]:
     return dispatch_tool_call("get_satellite_info", {"query": query})
+
+
+@app.get("/live/stats")
+async def live_stats() -> dict[str, int]:
+    """Stats about the live conjunction stream."""
+    return hub.stats()
+
+
+@app.get("/live/recent")
+async def live_recent() -> list[dict[str, Any]]:
+    """Recent alerts from the live stream (in-memory history)."""
+    from dataclasses import asdict
+    return [asdict(a) for a in hub.recent[-50:]]
+
+
+@app.on_event("startup")
+async def _start_demo_emit() -> None:
+    """Kick off the demo emit loop in the background. In production this is
+    replaced by the real ContinuousMonitor."""
+    import asyncio
+    asyncio.create_task(demo_emit_loop())
+
+
+# ---- WebSocket: live conjunction stream ----
+
+@app.websocket("/ws/live")
+async def ws_live(websocket: WebSocket) -> None:
+    """Public live conjunction alert stream.
+
+    Optional filter from client: {"type": "filter", "sat_ids": [25544, ...]}
+    """
+    await websocket.accept()
+    hub.add_connection(websocket, sat_filter=None)
+    try:
+        # Replay last 5 alerts on connect
+        for a in hub.recent[-5:]:
+            await websocket.send_text(a.to_json())
+        while True:
+            msg = await websocket.receive_text()
+            try:
+                data = __import__("json").loads(msg)
+                if data.get("type") == "filter":
+                    sat_ids = data.get("sat_ids")
+                    if isinstance(sat_ids, list):
+                        hub.update_filter(websocket, set(sat_ids))
+                    else:
+                        hub.update_filter(websocket, None)
+            except Exception:
+                pass
+    except WebSocketDisconnect:
+        pass
+    finally:
+        hub.remove_connection(websocket)
 
 
 # ---- WebSocket: live agent streaming ----

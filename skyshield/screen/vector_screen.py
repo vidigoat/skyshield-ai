@@ -133,59 +133,79 @@ def vector_screen(
             pair_samples.setdefault(key, []).append((times[k], float(d_val)))
 
     # ---- Stage 4: swept-volume between-sample check (catches fast flybys) ----
+    # Only check (pair, interval) combinations where the pair is "near" each other
+    # at one of the bracketing time samples — within `bridge_radius`. This avoids
+    # the O(N^2 * T) all-pair-all-time scan.
     if swept_volume_check:
-        # For each pair (i, j) and each consecutive pair of samples, compute the
-        # closest approach assuming linear motion within the interval. If the
-        # minimum distance during the interval is within the screening radius
-        # AND falls in (t_k, t_k+1) (i.e., the bracketed minimum is interior to
-        # the interval), add it as a sample.
-        for i in range(n_obj):
-            if not active[i].any():
-                continue
-            for j in range(i + 1, n_obj):
-                if not survives_ap[i, j]:
-                    continue
-                # Both objects must be active at at least one common time slice
-                common = active[i] & active[j]
-                if not common.any():
-                    continue
-                idx = np.where(common)[0]
-                if idx.size < 2:
-                    continue
-                # Relative position and velocity at each common time
-                r_rel = positions[j, idx] - positions[i, idx]
-                v_rel = velocities[j, idx] - velocities[i, idx]
-                d_now = np.linalg.norm(r_rel, axis=1)
+        bridge_radius = max(2.5 * screening_radius_km, screening_radius_km + 50.0)
+        br2 = bridge_radius * bridge_radius
 
-                # For each consecutive pair (k, k+1), interpolate the relative
-                # motion as r_rel(t) = r0 + v0 * (t - t_k). The minimum of
-                # |r_rel(t)| over the interval is at t_min = -r0.v0 / |v0|^2,
-                # clamped to [0, dt].
-                for k in range(idx.size - 1):
-                    k0 = idx[k]
-                    k1 = idx[k + 1]
-                    if k1 - k0 != 1:
-                        # Non-consecutive: don't interpolate across gaps
-                        continue
-                    dt = (times[k1] - times[k0]).total_seconds()
-                    r0 = r_rel[k]
-                    v0 = v_rel[k]
-                    v_sq = v0 @ v0
-                    if v_sq < 1e-12:
-                        continue
-                    t_star = -float(r0 @ v0) / v_sq
-                    if t_star <= 0 or t_star >= dt:
-                        continue  # min not interior to the interval
-                    r_min = r0 + v0 * t_star
-                    d_min = float(np.linalg.norm(r_min))
-                    if d_min > screening_radius_km:
-                        continue
-                    # Found an interior minimum within radius
-                    t_min_epoch = times[k0] + timedelta(seconds=t_star)
-                    id_i = sat_ids[i]
-                    id_j = sat_ids[j]
-                    key = (min(id_i, id_j), max(id_i, id_j))
-                    pair_samples.setdefault(key, []).append((t_min_epoch, d_min))
+        for k in range(n_steps - 1):
+            # Pairs that are within `bridge_radius` at either endpoint
+            active_now = active[:, k]
+            active_next = active[:, k + 1]
+            both_active = active_now & active_next
+            if both_active.sum() < 2:
+                continue
+            idx_a = np.where(both_active)[0]
+            p0 = positions[idx_a, k]      # (M, 3)
+            p1 = positions[idx_a, k + 1]
+            v0 = velocities[idx_a, k]
+            v1 = velocities[idx_a, k + 1]
+
+            # Distance matrix at sample k
+            sq_norms_k = (p0 * p0).sum(axis=1)
+            dot_k = p0 @ p0.T
+            d2_k = sq_norms_k[:, None] + sq_norms_k[None, :] - 2 * dot_k
+            np.fill_diagonal(d2_k, np.inf)
+            close_now = d2_k <= br2
+
+            # Distance matrix at sample k+1
+            sq_norms_k1 = (p1 * p1).sum(axis=1)
+            dot_k1 = p1 @ p1.T
+            d2_k1 = sq_norms_k1[:, None] + sq_norms_k1[None, :] - 2 * dot_k1
+            np.fill_diagonal(d2_k1, np.inf)
+            close_next = d2_k1 <= br2
+
+            close_any = close_now | close_next
+            # Apogee-perigee filter (apply to active subset)
+            ap_sub = survives_ap[np.ix_(idx_a, idx_a)]
+            close_any &= ap_sub
+            # Upper triangle only
+            close_any = np.triu(close_any, k=1)
+
+            ii, jj = np.where(close_any)
+            if ii.size == 0:
+                continue
+
+            # Vectorized swept-volume minimum for these candidate pairs
+            r0_rel = p0[jj] - p0[ii]            # (P, 3)
+            v0_rel = v0[jj] - v0[ii]
+            v_sq = (v0_rel * v0_rel).sum(axis=1)
+            t_star = np.zeros_like(v_sq)
+            mask_vs = v_sq > 1e-12
+            t_star[mask_vs] = -(r0_rel[mask_vs] * v0_rel[mask_vs]).sum(axis=1) / v_sq[mask_vs]
+            dt = time_step_seconds
+            interior = mask_vs & (t_star > 0) & (t_star < dt)
+            if not interior.any():
+                continue
+
+            t_clip = np.clip(t_star, 0.0, dt)
+            r_min = r0_rel + v0_rel * t_clip[:, None]
+            d_min = np.linalg.norm(r_min, axis=1)
+            within = interior & (d_min <= screening_radius_km)
+            if not within.any():
+                continue
+
+            sel = np.where(within)[0]
+            for s in sel:
+                i_g = int(idx_a[ii[s]])
+                j_g = int(idx_a[jj[s]])
+                t_min_epoch = times[k] + timedelta(seconds=float(t_star[s]))
+                id_i = sat_ids[i_g]
+                id_j = sat_ids[j_g]
+                key = (min(id_i, id_j), max(id_i, id_j))
+                pair_samples.setdefault(key, []).append((t_min_epoch, float(d_min[s])))
 
     # ---- Stage 5: local-minima detection per pair ----
     candidates: list[CandidatePair] = []
