@@ -79,9 +79,8 @@ def classify_orbit_regime(
         return OrbitRegime.NEAR_EARTH_TABLE4 if period_min < 225 else OrbitRegime.DEEP_SPACE_TABLE4
 
     # SFSH Table 3 — Deep Space
-    if 1300 < period_min < 1800:
-        if inclination_deg is None or inclination_deg < 35:
-            return OrbitRegime.DEEP_SPACE_TABLE3
+    if 1300 < period_min < 1800 and (inclination_deg is None or inclination_deg < 35):
+        return OrbitRegime.DEEP_SPACE_TABLE3
 
     # SFSH Table 3 — LEO buckets by perigee
     if perigee_km <= 500:

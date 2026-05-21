@@ -58,7 +58,7 @@ def pc_patera(
         return float("nan")
 
     cov_combined = combine_covariance(cov1_pos_j2000, cov2_pos_j2000)
-    cov_2d, basis = project_to_encounter_plane(cov_combined, v_rel)
+    cov_2d, _basis = project_to_encounter_plane(cov_combined, v_rel)
     miss_2d, _ = project_position(miss, v_rel)
     sigma_x, sigma_y, theta = diagonalize_2x2(cov_2d)
     if sigma_x < 1e-12 or sigma_y < 1e-12:
@@ -73,7 +73,6 @@ def pc_patera(
 
     # Trapezoidal integration around the boundary
     ts = np.linspace(0.0, 2.0 * np.pi, n_segments + 1)[:-1]
-    dt = 2.0 * np.pi / n_segments
     bx = rho_km * np.cos(ts)
     by = rho_km * np.sin(ts)
 

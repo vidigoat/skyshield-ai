@@ -72,7 +72,7 @@ def pc_alfano2004(
 
     # Combine covariances and project into encounter plane
     cov_combined = combine_covariance(cov1_pos_j2000, cov2_pos_j2000)
-    cov_2d, basis = project_to_encounter_plane(cov_combined, v_rel)
+    cov_2d, _basis = project_to_encounter_plane(cov_combined, v_rel)
     miss_2d, _ = project_position(miss, v_rel)
 
     # Diagonalize covariance to principal axes

@@ -49,7 +49,7 @@ def run_benchmark(n_satellites: int = 1000, n_steps: int = 100, smoke: bool = Fa
 
     # Timed run
     t0 = perf_counter()
-    r, v = propagate_batch(elements, t_minutes)
+    r, _v = propagate_batch(elements, t_minutes)
     jax.block_until_ready(r)
     elapsed = perf_counter() - t0
 

@@ -74,10 +74,7 @@ def optimize_avoidance_maneuver(
     # Initial guess: small along-track burn
     rel_v = jnp.asarray(v2_at_tca_kms - v1_at_tca_kms, dtype=jnp.float64)
     rel_v_norm = jnp.linalg.norm(rel_v)
-    if rel_v_norm > 1e-6:
-        dv = -1e-4 * (rel_v / rel_v_norm)
-    else:
-        dv = jnp.array([1e-4, 0.0, 0.0])
+    dv = -0.0001 * (rel_v / rel_v_norm) if rel_v_norm > 1e-06 else jnp.array([0.0001, 0.0, 0.0])
 
     # Plain SGD with momentum
     momentum = jnp.zeros(3)

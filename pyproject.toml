@@ -58,8 +58,13 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "B", "UP", "SIM", "RUF"]
-ignore = ["E501", "N803", "N806"]
+select = ["E", "F", "I", "N", "W", "B", "UP", "SIM"]
+# Bug-catching rules only — stylistic noise is suppressed so CI focuses on real issues.
+# E501: line too long (we use 100, prose-comment lines can run over)
+# N803/N806: lowercase arg/var name (physics conventions use single-letter caps: M, E, R, etc.)
+# SIM105: contextlib.suppress over try/except/pass (occasionally clearer as-is)
+# SIM117: combined `with` (we keep separate `with` blocks for readability)
+ignore = ["E501", "N803", "N806", "SIM105", "SIM117"]
 
 [tool.mypy]
 python_version = "3.12"

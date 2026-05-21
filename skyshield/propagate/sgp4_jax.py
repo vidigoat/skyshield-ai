@@ -122,7 +122,7 @@ def _propagate_one_arrays(
     mo = jnp.asarray(mo)
     bstar = jnp.asarray(bstar)
 
-    (a, ao, cosio, sinio, eccsq, omeosq, rteosq, x3thm1, con41, con42,
+    (a, _ao, cosio, _sinio, _eccsq, _omeosq, rteosq, x3thm1, _con41, con42,
      no_unkozai, po) = _initl(no_kozai, ecco, inclo)
 
     # Secular rates due to J2 (Brouwer)
@@ -134,7 +134,6 @@ def _propagate_one_arrays(
     nodedot = -temp1 * cosio + 0.5 * temp2 * (4.0 - 19.0 * cosio**2) * cosio
 
     # Drag terms (atmospheric drag via Bstar)
-    pinvsq2 = pinvsq * pinvsq
     cc2 = 1.0 / (a * a * no_unkozai) * (1.0 - ecco**2) ** 1.5
     # Simplified drag — for high-altitude (drag-free) sats this is ~0 and irrelevant
     drag_coef = bstar * cc2
@@ -145,7 +144,6 @@ def _propagate_one_arrays(
     xnoddf = nodeo + nodedot * t_minutes_from_epoch
     em = jnp.clip(ecco - drag_coef * t_minutes_from_epoch, 1e-6, 0.999)
     am = a
-    xn = no_unkozai
 
     # Solve Kepler's equation: M = E - e sin E
     e = em
@@ -162,8 +160,10 @@ def _propagate_one_arrays(
     cosv = (cose - e) / (1.0 - e * cose)
     v = jnp.arctan2(sinv, cosv)
     r = am * (1.0 - e * cose)
-    rdot = jnp.sqrt(MU_EARTH / (am * R_EARTH ** 3)) * e * sine / (1.0 - e * cose)
-    rfdot = jnp.sqrt(MU_EARTH * am * R_EARTH ** 3 * (1.0 - e * e)) / (am * R_EARTH ** 2 * (1.0 - e * cose))
+    # NOTE: rdot and rfdot terms (radial + tangential velocity components) would
+    # appear here in a full SGP4. We compute velocity via the simplified Vis-Viva
+    # form below, which is accurate to ~km/s for LEO. Replace with the full set
+    # if you need <1 cm/s precision.
 
     # Orientation
     u = omgadf + v

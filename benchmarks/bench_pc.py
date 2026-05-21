@@ -21,7 +21,7 @@ def synth_conjunctions(n: int = 20, seed: int = 42) -> list[dict]:
     """Generate N synthetic conjunctions with varied geometries."""
     rng = np.random.default_rng(seed)
     fixtures: list[dict] = []
-    for i in range(n):
+    for _i in range(n):
         # Random orientations + miss distances 10m to 1km
         miss_km = rng.uniform(0.01, 1.0)
         # Random direction

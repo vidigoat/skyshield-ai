@@ -15,6 +15,7 @@ Endpoint (WebSocket):
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -177,7 +178,7 @@ async def ws_chat(websocket: WebSocket) -> None:
 
         # Stream tool events as they happen
         async def emit(event: ToolEvent) -> None:
-            try:
+            with contextlib.suppress(Exception):
                 await websocket.send_json({
                     "type": "tool_event",
                     "name": event.name,
@@ -185,8 +186,6 @@ async def ws_chat(websocket: WebSocket) -> None:
                     "output": event.output,
                     "elapsed_ms": event.elapsed_ms,
                 })
-            except Exception:
-                pass
 
         # The agent's on_tool_event callback is synchronous, so we use a thread-safe queue
         import asyncio
@@ -233,7 +232,5 @@ async def ws_chat(websocket: WebSocket) -> None:
     except WebSocketDisconnect:
         return
     except Exception as e:
-        try:
+        with contextlib.suppress(Exception):
             await websocket.send_json({"type": "error", "error": str(e)})
-        except Exception:
-            pass

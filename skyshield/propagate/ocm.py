@@ -26,6 +26,7 @@ user but ignored for screening.
 
 from __future__ import annotations
 
+import contextlib
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -329,18 +330,14 @@ def _try_parse_cov_row(
         first_epoch = parse_ocm_epoch(parts[0])
         # If epoch parses, the rest are covariance values
         for tok in parts[1:]:
-            try:
+            with contextlib.suppress(ValueError):
                 current_elements.append(float(tok))
-            except ValueError:
-                pass
         return first_epoch, current_elements
     except ValueError:
         # All tokens are floats continuing previous row
         for tok in parts:
-            try:
+            with contextlib.suppress(ValueError):
                 current_elements.append(float(tok))
-            except ValueError:
-                pass
         return current_epoch, current_elements
 
 

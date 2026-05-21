@@ -51,7 +51,7 @@ def pc_foster(
         return float("nan")
 
     cov_combined = combine_covariance(cov1_pos_j2000, cov2_pos_j2000)
-    cov_2d, basis = project_to_encounter_plane(cov_combined, v_rel)
+    cov_2d, _basis = project_to_encounter_plane(cov_combined, v_rel)
     miss_2d, _ = project_position(miss, v_rel)
     sigma_x, sigma_y, theta = diagonalize_2x2(cov_2d)
     if sigma_x < 1e-12 or sigma_y < 1e-12:
