@@ -157,6 +157,69 @@ async def satellite_info(query: str) -> dict[str, Any]:
     return dispatch_tool_call("get_satellite_info", {"query": query})
 
 
+# Cache for the Celestrak catalog (refreshed every 6 hours)
+_catalog_cache: dict[str, Any] = {"data": [], "fetched_at": 0.0}
+
+
+@app.get("/catalog")
+async def catalog(group: str = "starlink", limit: int = 5000) -> dict[str, Any]:
+    """Return current Celestrak TLE catalog for the globe.
+
+    Tries the live feed; falls back to a small synthetic set if Celestrak
+    isn't reachable. Cached for 6 hours.
+    """
+    import time
+    now = time.time()
+    if now - _catalog_cache["fetched_at"] < 6 * 3600 and _catalog_cache["data"]:
+        return {"group": group, "n": len(_catalog_cache["data"]), "satellites": _catalog_cache["data"]}
+
+    sats: list[dict[str, Any]] = []
+    try:
+        import httpx
+        url = f"https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=tle"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.get(url)
+            r.raise_for_status()
+            lines = [ln.rstrip() for ln in r.text.splitlines() if ln.strip()]
+            for i in range(0, len(lines), 3):
+                if i + 2 >= len(lines):
+                    break
+                name = lines[i].strip()
+                l1 = lines[i + 1]
+                l2 = lines[i + 2]
+                if not l1.startswith("1 ") or not l2.startswith("2 "):
+                    continue
+                try:
+                    norad = int(l1[2:7])
+                except ValueError:
+                    continue
+                sats.append({
+                    "norad_id": norad,
+                    "name": name,
+                    "line1": l1,
+                    "line2": l2,
+                })
+                if len(sats) >= limit:
+                    break
+    except Exception:
+        sats = []  # fall through to fallback
+
+    if not sats:
+        # Synthetic fallback (small, just so the globe has something)
+        sats = [
+            {
+                "norad_id": 25544,
+                "name": "ISS (ZARYA)",
+                "line1": "1 25544U 98067A   24001.50000000  .00012345  00000+0  22845-3 0  9991",
+                "line2": "2 25544  51.6400 247.4622 0006703 130.5360 325.0288 15.49558123431234",
+            },
+        ]
+
+    _catalog_cache["data"] = sats
+    _catalog_cache["fetched_at"] = now
+    return {"group": group, "n": len(sats), "satellites": sats}
+
+
 @app.get("/live/stats")
 async def live_stats() -> dict[str, int]:
     """Stats about the live conjunction stream."""

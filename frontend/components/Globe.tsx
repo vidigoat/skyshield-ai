@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { generateStarlinkCatalog, satColor, SatPoint } from "@/lib/sample-satellites";
 import { store } from "@/lib/store";
+import { API_URL } from "@/lib/api";
 import LiveAlertsTicker from "./LiveAlertsTicker";
 
 /**
@@ -32,7 +33,45 @@ export default function GlobeView() {
       const Globe = (await import("globe.gl")).default;
       if (cancelled) return;
 
-      const sats = generateStarlinkCatalog(42, 3000);
+      // Try the backend's /catalog endpoint first (live Celestrak feed); fall
+      // back to the synthetic Starlink-shell if the backend isn't reachable.
+      let sats: SatPoint[] = generateStarlinkCatalog(42, 3000);
+      try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 4000);
+        const resp = await fetch(`${API_URL}/catalog?group=starlink&limit=4000`, { signal: ctrl.signal });
+        clearTimeout(tid);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (Array.isArray(data?.satellites) && data.satellites.length > 0) {
+            const satjs = await import("satellite.js");
+            const now = new Date();
+            const real: SatPoint[] = [];
+            for (const s of data.satellites as { norad_id: number; name: string; line1: string; line2: string }[]) {
+              try {
+                const rec = satjs.twoline2satrec(s.line1, s.line2);
+                const pv = satjs.propagate(rec, now);
+                if (!pv || !pv.position || typeof pv.position === "boolean") continue;
+                const gmst = satjs.gstime(now);
+                const geo = satjs.eciToGeodetic(pv.position, gmst);
+                real.push({
+                  id: s.norad_id,
+                  name: s.name,
+                  lat: satjs.degreesLat(geo.latitude),
+                  lng: satjs.degreesLong(geo.longitude),
+                  alt: geo.height / 6378.137,
+                  risk: 0,
+                });
+              } catch {
+                // skip bad TLE
+              }
+            }
+            if (real.length > 100) sats = real;
+          }
+        }
+      } catch {
+        // backend not reachable -> stick with synthetic
+      }
 
       const globe = new Globe(containerRef.current)
         .globeImageUrl(
