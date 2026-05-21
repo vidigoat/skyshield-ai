@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0e27;
+  --foreground: #e2e8f0;
+  --accent: #00d9ff;
+  --danger: #ff3b3b;
+  --panel: rgba(15, 23, 42, 0.85);
+  --border: rgba(148, 163, 184, 0.18);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-panel: var(--panel);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Globe.gl canvas */
+.globe-container canvas {
+  display: block;
+}
+
+/* Subtle scanline overlay for the demo aesthetic */
+.scanline {
+  pointer-events: none;
+  background-image: linear-gradient(
+    rgba(0, 217, 255, 0.03) 50%,
+    transparent 50%
+  );
+  background-size: 100% 4px;
+}
+
+/* Tool-call streaming animation */
+@keyframes tool-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+.tool-pulse {
+  animation: tool-pulse 1.4s ease-in-out infinite;
+}
+
+/* Chat message bubbles */
+.msg-user  { background: linear-gradient(135deg, #1e293b, #0f172a); border: 1px solid var(--border); }
+.msg-agent { background: linear-gradient(135deg, #0c1733, #060b1f); border: 1px solid rgba(0, 217, 255, 0.25); }
+.msg-tool  {
+  background: rgba(15, 23, 42, 0.55);
+  border-left: 2px solid var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
