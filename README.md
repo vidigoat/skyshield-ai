@@ -4,7 +4,7 @@
 
 An open-source AI agent that anyone with a satellite can ask "is it safe?" — backed by physics **validated 100% against the US Office of Space Commerce's official [TraCSS](https://space.commerce.gov/traffic-coordination-system-for-space-tracss/) conjunction-prediction benchmark.**
 
-The two-tab live demo: a **3D globe of every tracked satellite** + a **chat agent that streams its physics tool calls live** as it answers your question.
+**[skyshield-ai-eosin.vercel.app](https://skyshield-ai-eosin.vercel.app)** — open the chat agent and ask "is the ISS at risk this week?" Watch the physics tool calls stream live.
 
 > Built solo by [Vidit Patankar](https://github.com/vidigoat) (14, Gurgaon) in response to Elon Musk's [May 21, 2026 SpaceXAI hiring tweet](https://x.com/elonmusk/status/...).
 

@@ -6,11 +6,11 @@
 
 Hi —
 
-- Built **SkyShield AI** ([github.com/vidigoat/skyshield-ai](https://github.com/vidigoat/skyshield-ai)) — open AI agent for satellite conjunction analysis. **100% pair-level recall and 100% precision against the US Office of Space Commerce TraCSS verification answer key** on a 79-OCM subset of the official Aerospace IVV dataset (CC0-1.0, released Oct 2025). The agent uses Anthropic Claude with verified physics tools — anyone with a satellite can ask "is it safe?" in plain English and get a TraCSS-validated answer.
+- Built **SkyShield AI** ([skyshield-ai-eosin.vercel.app](https://skyshield-ai-eosin.vercel.app) · [github.com/vidigoat/skyshield-ai](https://github.com/vidigoat/skyshield-ai)) — open AI agent for satellite conjunction analysis. **100% pair-level recall and 100% precision against the US Office of Space Commerce TraCSS verification answer key** on a 79-OCM subset of the official Aerospace IVV dataset (CC0-1.0, released Oct 2025). The agent uses Anthropic Claude with verified physics tools — anyone with a satellite can ask "is it safe?" in plain English and get a TraCSS-validated answer with the tool calls streamed live as it computes.
 
 - The novel pieces no existing open tool ships: (1) fully **vectorized swept-volume screener** that catches fast-flyby conjunctions discrete sampling misses (this is what closed the recall gap from 62.5% to 100% in one architectural shift), (2) **joint multi-fleet maneuver coordinator** that solves the operator-with-N-satellites problem beyond pair-wise avoidance (no open implementation existed before this), (3) **public WebSocket conjunction alert stream** — open complement to Stargaze, free, no login required. Architecture went from 12.5% → 100% pair recall in one night via four documented commits — every step in git history.
 
-- I'm 14, based in India, no degree. **~9,000 LOC of original code, 67/67 tests passing, CI green, MIT-licensed**, ~25 logical commits. Run `git clone` + `uv run pytest` to verify, or `uv run python notebooks/01_walkthrough.py` to see every layer demo'd end-to-end in 30 seconds. Will work for free, remotely, on SpaceXAI's hardest open agent / SSA problems.
+- I'm 14, based in India, no degree. **~9,000 LOC of original code, 67/67 tests passing, CI green, MIT-licensed**, ~30 logical commits. Live demo: [skyshield-ai-eosin.vercel.app](https://skyshield-ai-eosin.vercel.app) — open it, type "is the ISS at risk this week?" and watch the physics tool calls stream live. Or `git clone` + `uv run pytest` to verify, or `uv run python notebooks/01_walkthrough.py` to see every layer demo'd end-to-end in 30 seconds. Will work for free, remotely, on SpaceXAI's hardest open agent / SSA problems.
 
 — Vidit
 
