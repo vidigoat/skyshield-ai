@@ -4,7 +4,11 @@
 
 An open-source AI agent that anyone with a satellite can ask "is it safe?" — backed by physics **validated 100% against the US Office of Space Commerce's official [TraCSS](https://space.commerce.gov/traffic-coordination-system-for-space-tracss/) conjunction-prediction benchmark.**
 
-**[skyshield-ai-eosin.vercel.app](https://skyshield-ai-eosin.vercel.app)** — open the chat agent and ask "is the ISS at risk this week?" Watch the physics tool calls stream live.
+**[skyshield-ai-eosin.vercel.app](https://skyshield-ai-eosin.vercel.app)** — open the chat agent and ask "show me the top 10 riskiest conjunctions" or "is the ISS at risk this week?". Watch the physics tool calls stream live.
+
+## Original artifact: [Top 100 Riskiest Conjunctions in TraCSS](data/top_100_riskiest.md)
+
+The first public ranking of the highest-Pc events from the **US Office of Space Commerce TraCSS verification dataset** (913,330 conjunctions, October 2025). Filtered to 214,623 robust events (dropped 698,649 diluted-covariance entries), ranked by Alfano-2004 Pc. Top result: NORAD 42810 ↔ 48183, Pc = 8.5e-7, miss 0.94 km, vrel 14.9 km/s. Full table: [`data/top_100_riskiest.md`](data/top_100_riskiest.md).
 
 > Built solo by [Vidit Patankar](https://github.com/vidigoat) (14, Gurgaon) in response to Elon Musk's [May 21, 2026 SpaceXAI hiring tweet](https://x.com/elonmusk/status/...).
 
