@@ -2,6 +2,8 @@
 
 > **Open AI agent for satellite safety. Verified physics, plain English.**
 
+> ⏸️ **Status (2026-05-24): Paused.** Code preserved as-is at the last working commit. Live demo still up at [skyshield-ai-eosin.vercel.app](https://skyshield-ai-eosin.vercel.app). Founder pivoted to [TaxTrace](https://github.com/vidigoat/taxtrace) (open federal-spending forensics) and then [Titan](https://titan-ai.co) (autonomous AI agent for businesses). This repo is open MIT — fork it, revive it, or learn from the physics + agent architecture below.
+
 An open-source AI agent that anyone with a satellite can ask "is it safe?" — backed by physics **validated 100% against the US Office of Space Commerce's official [TraCSS](https://space.commerce.gov/traffic-coordination-system-for-space-tracss/) conjunction-prediction benchmark.**
 
 **[skyshield-ai-eosin.vercel.app](https://skyshield-ai-eosin.vercel.app)** — open the chat agent and ask "show me the top 10 riskiest conjunctions" or "is the ISS at risk this week?". Watch the physics tool calls stream live.
