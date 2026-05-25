@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Message from "./Message";
 import Composer from "./Composer";
-import { openAgentWebSocket, pickDemoFlow } from "../lib/api";
+import { openAgentWebSocket, postChat } from "../lib/api";
 import { type ChatMessage, uid } from "../lib/types";
 
 const INITIAL_MESSAGE: ChatMessage = {
@@ -44,10 +44,70 @@ export default function Chat() {
       setThinking(true);
 
       let appended = false;
+      let sawToolEvent = false;
+
+      const finishWithError = (msg: string) => {
+        if (appended) return;
+        appended = true;
+        setMessages((m) => [
+          ...m,
+          {
+            id: uid(),
+            role: "agent",
+            text: msg,
+            timestamp: Date.now(),
+          },
+        ]);
+        setStreaming(false);
+        setThinking(false);
+      };
+
+      // REST fallback — runs the real backend (not a hardcoded demo)
+      // when the WebSocket closes before delivering a `final` event.
+      const restFallback = async () => {
+        if (appended) return;
+        try {
+          const resp = await postChat(text);
+          if (appended) return;
+          appended = true;
+          // Only append tool events if the WS hadn't already shown them.
+          if (!sawToolEvent) {
+            for (const ev of resp.tool_events) {
+              setMessages((m) => [
+                ...m,
+                {
+                  id: uid(),
+                  role: "tool",
+                  toolName: ev.name,
+                  toolInput: ev.input,
+                  toolOutput: ev.output,
+                  elapsedMs: ev.elapsed_ms,
+                  timestamp: Date.now(),
+                },
+              ]);
+            }
+          }
+          setMessages((m) => [
+            ...m,
+            {
+              id: uid(),
+              role: "agent",
+              text: resp.text,
+              timestamp: Date.now(),
+            },
+          ]);
+        } catch (err) {
+          finishWithError(`[error] ${(err as Error).message ?? String(err)}`);
+          return;
+        }
+        setStreaming(false);
+        setThinking(false);
+      };
 
       const ws = openAgentWebSocket(
         (ev) => {
           if (ev.type === "tool_event") {
+            sawToolEvent = true;
             setThinking(false);
             setMessages((m) => [
               ...m,
@@ -76,75 +136,24 @@ export default function Chat() {
             ]);
             setStreaming(false);
           } else if (ev.type === "error") {
-            appended = true;
-            setMessages((m) => [
-              ...m,
-              {
-                id: uid(),
-                role: "agent",
-                text: `[error] ${ev.error}`,
-                timestamp: Date.now(),
-              },
-            ]);
-            setStreaming(false);
-            setThinking(false);
+            finishWithError(`[error] ${ev.error}`);
           }
         },
         () => {
-          if (!appended) {
-            // Connection closed without a `final` — fall to stub
-            playDemo(text);
-          }
+          // WS closed without `final`. Use the REST endpoint (real backend),
+          // never a hardcoded demo — demos lie about what the agent did.
+          if (!appended) void restFallback();
         },
       );
 
       if (!ws) {
-        playDemo(text);
+        void restFallback();
         return;
       }
       ws.onopen = () => ws.send(JSON.stringify({ type: "user_message", message: text }));
     },
     [streaming],
   );
-
-  // Stub-mode playback for when the backend isn't reachable
-  const playDemo = (text: string) => {
-    const flow = pickDemoFlow(text);
-    let delay = 700;
-    setThinking(true);
-    for (const step of flow.steps) {
-      setTimeout(() => {
-        setThinking(false);
-        setMessages((m) => [
-          ...m,
-          {
-            id: uid(),
-            role: "tool",
-            toolName: step.name,
-            toolInput: step.input,
-            toolOutput: step.output,
-            elapsedMs: step.elapsed_ms,
-            timestamp: Date.now(),
-          },
-        ]);
-        setThinking(true);
-      }, delay);
-      delay += 900 + Math.random() * 400;
-    }
-    setTimeout(() => {
-      setThinking(false);
-      setMessages((m) => [
-        ...m,
-        {
-          id: uid(),
-          role: "agent",
-          text: flow.finalText,
-          timestamp: Date.now(),
-        },
-      ]);
-      setStreaming(false);
-    }, delay + 300);
-  };
 
   return (
     <div className="flex-1 flex flex-col min-h-0">

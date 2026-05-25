@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from skyshield.agent.tools import TOOL_SCHEMAS, dispatch_tool_call
+from skyshield.server.cost_tracker import check_cap, record_usage
 
 # Lazy-load the system prompt
 _SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
@@ -109,6 +110,7 @@ class SkyShieldAgent:
         tool_events: list[ToolEvent] = []
 
         for iteration in range(self.max_iterations):
+            check_cap()
             response = self._client.messages.create(
                 model=self.model,
                 max_tokens=4096,
@@ -116,6 +118,12 @@ class SkyShieldAgent:
                 tools=TOOL_SCHEMAS,
                 messages=messages,
             )
+            usage = getattr(response, "usage", None)
+            if usage is not None:
+                record_usage(
+                    input_tokens=getattr(usage, "input_tokens", 0) or 0,
+                    output_tokens=getattr(usage, "output_tokens", 0) or 0,
+                )
 
             # Did Claude request a tool call?
             tool_use_blocks = [

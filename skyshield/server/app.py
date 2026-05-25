@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from skyshield import __version__
 from skyshield.agent.agent import SkyShieldAgent, ToolEvent
 from skyshield.agent.tools import dispatch_tool_call
+from skyshield.server.cost_tracker import SpendCapExceeded, current_spend
 from skyshield.server.live_stream import demo_emit_loop, hub
 from skyshield.server.rate_limit import RateLimiter
 
@@ -105,6 +106,12 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/spend")
+async def spend() -> dict[str, float]:
+    """Cumulative agent spend + remaining USD before hard cap."""
+    return current_spend()
+
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     """Send a question to the agent, get a plain-English answer with tool trace."""
@@ -113,7 +120,10 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
         raise HTTPException(status_code=429, detail="Daily rate limit exceeded")
 
     agent = SkyShieldAgent(model=req.model or "claude-sonnet-4-6")
-    resp = agent.ask(req.message)
+    try:
+        resp = agent.ask(req.message)
+    except SpendCapExceeded as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
     return ChatResponse(
         text=resp.text,
         tool_events=[
@@ -338,7 +348,12 @@ async def ws_chat(websocket: WebSocket) -> None:
         while not queue.empty():
             await emit(queue.get_nowait())
 
-        resp = await result_future
+        try:
+            resp = await result_future
+        except SpendCapExceeded as cap_err:
+            with contextlib.suppress(Exception):
+                await websocket.send_json({"type": "error", "error": str(cap_err)})
+            return
         await websocket.send_json({
             "type": "final",
             "text": resp.text,

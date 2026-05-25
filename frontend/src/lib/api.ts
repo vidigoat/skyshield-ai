@@ -38,6 +38,37 @@ export type WsEvent = ToolEvent | FinalEvent | ErrorEvent;
  *
  * Returns null when WebSocket isn't supported (SSR, or if the constructor throws).
  */
+export type ChatRestResponse = {
+  text: string;
+  tool_events: Array<{
+    name: string;
+    input: Record<string, unknown>;
+    output: Record<string, unknown>;
+    elapsed_ms: number;
+  }>;
+  n_iterations: number;
+  model: string;
+};
+
+/**
+ * Send a chat message via the REST endpoint and wait for the full response.
+ * Used as a fallback when the WebSocket closes before delivering `final`
+ * (App Runner's Envoy proxy occasionally drops WS frames). The response
+ * always comes from the real backend — never a hardcoded demo.
+ */
+export async function postChat(message: string): Promise<ChatRestResponse> {
+  const r = await fetch(`${API_URL}/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+  if (!r.ok) {
+    const text = await r.text().catch(() => "");
+    throw new Error(`${r.status} ${r.statusText}${text ? ` — ${text}` : ""}`);
+  }
+  return (await r.json()) as ChatRestResponse;
+}
+
 export function openAgentWebSocket(
   onEvent: (ev: WsEvent) => void,
   onClose: () => void,
